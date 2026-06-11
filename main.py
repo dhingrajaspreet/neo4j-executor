@@ -3,7 +3,13 @@ from pydantic import BaseModel
 from neo4j import GraphDatabase
 import os
 
-app = FastAPI()
+app = FastAPI(
+    servers=[
+        {
+            "url": "https://neo4j-executor.onrender.com"
+        }
+    ]
+)
 
 URI = os.getenv("NEO4J_URI")
 USER = os.getenv("NEO4J_USERNAME")
