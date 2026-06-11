@@ -1,12 +1,13 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from neo4j import GraphDatabase
+import os
 
 app = FastAPI()
 
-URI = "neo4j+s://515d24ed.databases.neo4j.io"
-USER = "neo4j"
-PASSWORD = "JGBnjaV31qOamltdNCsEszJlEni-oF7TmlrTW2R2FhY"
+URI = os.getenv("NEO4J_URI")
+USER = os.getenv("NEO4J_USERNAME")
+PASSWORD = os.getenv("NEO4J_PASSWORD")
 
 driver = GraphDatabase.driver(
     URI,
