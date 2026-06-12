@@ -42,7 +42,8 @@ def execute(query: QueryInput):
 
     return {
         "success": True,
-        "message": "Cypher executed successfully"
+        "message": "Cypher executed successfully",
+        "graph_url": "https://neo4j-executor-1.onrender.com/graph"
     }
 
 
