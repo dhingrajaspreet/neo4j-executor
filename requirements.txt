@@ -1,3 +1,6 @@
 fastapi
 uvicorn
 neo4j
+pydantic
+pyvis
+networkx
