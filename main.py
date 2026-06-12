@@ -1,6 +1,9 @@
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from neo4j import GraphDatabase
+from pyvis.network import Network
+import networkx as nx
 import os
 
 app = FastAPI(
@@ -22,17 +25,15 @@ driver = GraphDatabase.driver(
 )
 
 
-# ----------------------------
-# Input model
-# ----------------------------
 class QueryInput(BaseModel):
     cypher_query: str
 
 
-# ----------------------------
-# Existing endpoint
-# Writes graph into Neo4j
-# ----------------------------
+@app.get("/")
+def home():
+    return {"status": "running"}
+
+
 @app.post("/execute-cypher")
 def execute(query: QueryInput):
 
@@ -45,52 +46,85 @@ def execute(query: QueryInput):
     }
 
 
-# ----------------------------
-# New endpoint
-# Reads graph from Neo4j
-# ----------------------------
 @app.get("/view-graph")
 def view_graph():
 
+    nodes = []
+    edges = []
+
     with driver.session() as session:
 
-        result = session.run("""
+        node_result = session.run("""
             MATCH (n)
-            OPTIONAL MATCH (n)-[r]->(m)
-            RETURN n, r, m
+            RETURN elementId(n) as id, labels(n)[0] as label
         """)
 
-        nodes = set()
-        edges = []
+        for record in node_result:
+            nodes.append({
+                "id": record["id"],
+                "label": record["label"]
+            })
 
-        for record in result:
+        edge_result = session.run("""
+            MATCH (a)-[r]->(b)
+            RETURN elementId(a) as source,
+                   elementId(b) as target,
+                   type(r) as label
+        """)
 
-            n = record["n"]
-            r = record["r"]
-            m = record["m"]
+        for record in edge_result:
+            edges.append({
+                "source": record["source"],
+                "target": record["target"],
+                "label": record["label"]
+            })
 
-            if n:
-                nodes.add(list(n.labels)[0])
-
-            if r and m:
-                edges.append({
-                    "source": list(n.labels)[0],
-                    "target": list(m.labels)[0],
-                    "label": r.type
-                })
-
-        return {
-            "nodes": list(nodes),
-            "edges": edges
-        }
-
-
-# ----------------------------
-# Health check
-# Optional but useful
-# ----------------------------
-@app.get("/")
-def root():
     return {
-        "status": "running"
+        "nodes": nodes,
+        "edges": edges
     }
+
+
+@app.get("/graph", response_class=HTMLResponse)
+def graph():
+
+    G = nx.DiGraph()
+
+    with driver.session() as session:
+
+        node_result = session.run("""
+            MATCH (n)
+            RETURN elementId(n) as id, labels(n)[0] as label
+        """)
+
+        for record in node_result:
+            G.add_node(
+                record["id"],
+                label=record["label"]
+            )
+
+        edge_result = session.run("""
+            MATCH (a)-[r]->(b)
+            RETURN elementId(a) as source,
+                   elementId(b) as target,
+                   type(r) as label
+        """)
+
+        for record in edge_result:
+            G.add_edge(
+                record["source"],
+                record["target"],
+                label=record["label"]
+            )
+
+    net = Network(
+        height="800px",
+        width="100%",
+        directed=True
+    )
+
+    net.from_nx(G)
+    net.save_graph("graph.html")
+
+    with open("graph.html", "r", encoding="utf-8") as f:
+        return f.read()
